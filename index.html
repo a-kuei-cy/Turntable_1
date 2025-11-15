@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幸運抽獎系統</title>
+
+    <style>
+        /* [CSS 樣式...] (與前一版相同，為節省空間故省略，實際程式碼中會包含) */
+        /* 基本頁面樣式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        /* --- 1. 名單設定介面 --- */
+        #setup-container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            display: flex; /* 預設顯示 */
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        #setup-container h2 {
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-group input[type="text"],
+        .input-group input[type="number"],
+        .input-group textarea {
+            flex-grow: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .input-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .input-group button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            white-space: nowrap; /* 防止按鈕文字換行 */
+        }
+        
+        .input-group button:hover {
+            background-color: #0056b3;
+        }
+
+        /* 目前名單 & 抽獎紀錄 共享樣式 */
+        #list-display, #history-display {
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        #list-display h3, #history-display h3 {
+            margin: 0 0 10px 0;
+        }
+
+        #name-list-container, #history-list-container {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            min-height: 50px;
+        }
+
+        #name-list-container ul, #history-list-container ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        #name-list-container li, #history-list-container li {
+            padding: 5px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+        
+        #name-list-container li:last-child, #history-list-container li:last-child {
+            border-bottom: none;
+        }
+
+        #empty-message, #empty-history-message {
+            color: #888;
+            text-align: center;
+            padding: 10px;
+        }
+        
+        /* 底部操作按鈕 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-buttons button {
+            flex-grow: 1;
+            padding: 12px;
+            font-size: 16px; /* 縮小一點字體以容納兩個按鈕 */
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+        }
+        
+        #clearListButton {
+            background-color: #f8f9fa;
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+
+        /* 新增：清除紀錄按鈕 */
+        #clearHistoryButton {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #6c757d;
+        }
+        
+        /* 開始抽獎按鈕 (獨立一行) */
+        #startDrawButton {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            margin-top: 10px;
+        }
+
+        /* --- 2. 輪盤介面 --- */
+        .wheel-wrapper {
+            display: none; /* 預設隱藏 */
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #wheelCanvas {
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            transition: transform 5s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+
+        .pointer {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #d9534f;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        #spinButton {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: 8px solid #f0f0f0;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            z-index: 5;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #spinButton:disabled {
+            cursor: not-allowed;
+            background-color: #eee;
+        }
+        
+        #backToSetupButton {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+    </head>
+<body>
+
+    <h1 id="main-title">幸運抽獎系統</h1>
+    
+    <div id="setup-container">
+        <h2>新增抽獎名單</h2>
+
+        <div class="input-group">
+            <input type="text" id="singleNameInput" placeholder="輸入姓名...">
+            <button id="addNameButton">新增</button>
+        </div>
+
+        <div class="input-group">
+            <textarea id="multiNameTextarea" placeholder="從 Excel 或記事本貼上名單 (每行一個)"></textarea>
+            <button id="addMultiButton">貼上</button>
+        </div>
+        
+        <div class="input-group">
+            <input type="number" id="numberGenInput" placeholder="輸入人數產生座號...">
+            <button id="genNumButton">產生</button>
+        </div>
+
+        <div id="list-display">
+            <h3>目前名單 (<span id="itemCount">0</span>)</h3>
+            <div id="name-list-container">
+                <ul id="nameList"></ul>
+                <p id="empty-message">目前名單是空的，請新增。</p>
+            </div>
+        </div>
+
+        <div id="history-display">
+            <h3>抽獎紀錄</h3>
+            <div id="history-list-container">
+                <ul id="historyList"></ul>
+                <p id="empty-history-message">目前沒有抽獎紀錄。</p>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="clearListButton">清空名單</button>
+            <button id="clearHistoryButton">清空紀錄</button>
+        </div>
+        <button id="startDrawButton">開始抽獎</button>
+    </div>
+
+    <div class="wheel-wrapper">
+        <div class="wheel-container">
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+            <div class="pointer"></div>
+            <button id="spinButton">旋轉！</button>
+        </div>
+        <button id="backToSetupButton">返回設定</button>
+    </div>
+
+
+    <script>
+        // --- 1. 通用變數與 DOM 元素 ---
+        let currentOptions = []; // 儲存名單
+        let drawHistory = []; // 儲存抽獎紀錄
+        
+        const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#C9CBCF", "#FFCD56"];
+
+        // [DOM 元素...] (與前一版相同)
+        const setupContainer = document.getElementById('setup-container');
+        const singleNameInput = document.getElementById('singleNameInput');
+        const addNameButton = document.getElementById('addNameButton');
+        const multiNameTextarea = document.getElementById('multiNameTextarea');
+        const addMultiButton = document.getElementById('addMultiButton');
+        const numberGenInput = document.getElementById('numberGenInput');
+        const genNumButton = document.getElementById('genNumButton');
+        const nameList = document.getElementById('nameList');
+        const emptyMessage = document.getElementById('empty-message');
+        const itemCount = document.getElementById('itemCount');
+        const clearListButton = document.getElementById('clearListButton');
+        const startDrawButton = document.getElementById('startDrawButton');
+        const mainTitle = document.getElementById('main-title');
+        const historyList = document.getElementById('historyList');
+        const emptyHistoryMessage = document.getElementById('empty-history-message');
+        const clearHistoryButton = document.getElementById('clearHistoryButton');
+        const wheelWrapper = document.querySelector('.wheel-wrapper');
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinButton = document.getElementById('spinButton');
+        const backToSetupButton = document.getElementById('backToSetupButton');
+        const radius = canvas.width / 2;
+
+        // 輪盤邏輯變數
+        let numOptions = 0;
+        let arc = 0;
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        // --- 2. 名單管理 (設定介面) ---
+
+        // [updateListDisplay, updateHistoryDisplay, addSingleName, addMultiNames, generateNumbers, clearList, clearHistory, startDraw, goBackToSetup 函式...]
+        // (這些函式與前一版相同，除了 startDraw 會在下面列出)
+
+        /** 更新顯示的名單列表 */
+        function updateListDisplay() {
+            nameList.innerHTML = '';
+            
+            if (currentOptions.length === 0) {
+                emptyMessage.style.display = 'block';
+            } else {
+                emptyMessage.style.display = 'none';
+                currentOptions.forEach(option => {
+                    const li = document.createElement('li');
+                    li.textContent = option;
+                    nameList.appendChild(li);
+                });
+            }
+            itemCount.textContent = currentOptions.length;
+        }
+
+        /** 更新顯示的抽獎紀錄 */
+        function updateHistoryDisplay() {
+            historyList.innerHTML = ''; // 清空舊列表
+            
+            if (drawHistory.length === 0) {
+                emptyHistoryMessage.style.display = 'block'; // 顯示空訊息
+            } else {
+                emptyHistoryMessage.style.display = 'none'; // 隱藏空訊息
+                
+                // 我們使用 slice().reverse() 來顯示最新抽出的在最上面
+                drawHistory.slice().reverse().forEach((record, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `第 ${drawHistory.length - index} 抽：${record}`;
+                    historyList.appendChild(li);
+                });
+            }
+        }
+
+        /** 新增單筆 */
+        function addSingleName() {
+            const name = singleNameInput.value.trim();
+            if (name) {
+                currentOptions.push(name);
+                updateListDisplay();
+                singleNameInput.value = '';
+            }
+        }
+        
+        /** 新增多筆 (貼上) */
+        function addMultiNames() {
+            const names = multiNameTextarea.value.trim().split('\n');
+            names.forEach(name => {
+                const trimmedName = name.trim();
+                if (trimmedName) {
+                    currentOptions.push(trimmedName);
+                }
+            });
+            updateListDisplay();
+            multiNameTextarea.value = '';
+        }
+
+        /** 產生座號 */
+        function generateNumbers() {
+            const count = parseInt(numberGenInput.value, 10);
+            if (count > 0) {
+                for (let i = 1; i <= count; i++) {
+                    currentOptions.push(`座號 ${i}`);
+                }
+                updateListDisplay();
+                numberGenInput.value = '';
+            }
+        }
+
+        /** 清空名單 */
+        function clearList() {
+            if (confirm('確定要清空所有名單嗎？')) {
+                currentOptions = [];
+                updateListDisplay();
+            }
+        }
+        
+        /** 清空紀錄 */
+        function clearHistory() {
+            if (confirm('確定要清空所有抽獎紀錄嗎？')) {
+                drawHistory = [];
+                updateHistoryDisplay();
+            }
+        }
+        
+        /** 開始抽獎 (切換介面) */
+        function startDraw() {
+            if (currentOptions.length < 2) {
+                alert('請至少新增兩個抽獎項目！');
+                return;
+            }
+            numOptions = currentOptions.length;
+            arc = (2 * Math.PI) / numOptions; // 每個扇形的角度 (弧度)
+            
+            // *** 關鍵修改：確保輪盤在切換時重設角度 ***
+            // 立即重設 (無動畫)
+            canvas.style.transition = 'none'; 
+            canvas.style.transform = 'rotate(0deg)';
+            currentRotation = 0;
+            
+            // 延遲一小段時間再重新繪製和顯示，確保重設生效
+            setTimeout(() => {
+                drawWheel(); // 用新名單繪製輪盤
+                
+                // 恢復動畫設定
+                canvas.style.transition = 'transform 5s cubic-bezier(0.1, 0.7, 0.1, 1)';
+                
+                // 切換介面
+                setupContainer.style.display = 'none';
+                wheelWrapper.style.display = 'flex';
+                mainTitle.textContent = '開始抽獎！';
+            }, 50); // 50毫秒延遲
+        }
+        
+        /** 返回設定 (切換介面) */
+        function goBackToSetup() {
+            isSpinning = false;
+            spinButton.disabled = false;
+            wheelWrapper.style.display = 'none';
+            setupContainer.style.display = 'flex';
+            mainTitle.textContent = '幸運抽獎系統';
+        }
+
+        // --- 3. 抽獎輪盤邏輯 ---
+
+        /** * *** 函式修改：繪製輪盤 ***
+         * 我們將起始角度 (startAngle) 設為 -Math.PI / 2，
+         * 這代表 12 點鐘方向，對準指針。
+         */
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // *** 新增：設定繪製的起始點為 12 點鐘方向 ***
+            const startAngle = -Math.PI / 2;
+
+            currentOptions.forEach((option, i) => {
+                // *** 修改：angle 現在會加上 startAngle 偏移 ***
+                const angle = startAngle + i * arc;
+                
+                ctx.beginPath();
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.moveTo(radius, radius);
+                ctx.arc(radius, radius, radius - 10, angle, angle + arc);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.save();
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 16px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                // (文字繪製邏輯不變，它會自動適應新的 angle)
+                const textAngle = angle + arc / 2;
+                ctx.translate(
+                    radius + (radius * 0.7) * Math.cos(textAngle),
+                    radius + (radius * 0.7) * Math.sin(textAngle)
+                );
+                ctx.rotate(textAngle + Math.PI / 2);
+                ctx.fillText(option, 0, 0);
+                ctx.restore();
+            });
+        }
+
+        /** 旋轉 (函式不變) */
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            spinButton.disabled = true;
+
+            const randomSpin = Math.floor(Math.random() * 360) + (360 * 5);
+            currentRotation += randomSpin;
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+        }
+
+        /** * *** 函式修改：旋轉結束 ***
+         * 計算邏輯現在變得更簡單直接。
+         */
+        function onSpinEnd() {
+            isSpinning = false;
+            spinButton.disabled = false;
+
+            // --- *** 這是新的計算邏輯 *** ---
+
+            // 1. 取得最終停在的角度 (0-359)
+            const finalAngle = currentRotation % 360;
+
+            // 2. 計算指針指向的角度 (相對於 12 點鐘方向)
+            // 輪盤順時針轉 finalAngle 度，指針等於指向 "原始" 輪盤的 (360 - finalAngle) 度位置
+            const winningAngle = (360 - finalAngle) % 360;
+
+            // 3. 計算每個扇形的角度 (度)
+            const arcDegrees = 360 / numOptions;
+
+            // 4. 找出獲獎索引
+            // 因為我們繪製時 (0,0) 已經對準 12 點鐘，所以可以直接計算
+            const winnerIndex = Math.floor(winningAngle / arcDegrees);
+            
+            // 5. 取得獲獎者
+            const winner = currentOptions[winnerIndex]; 
+
+            // --- 邏輯結束 ---
+
+            // (儲存紀錄 & 顯示結果的邏輯不變)
+            drawHistory.push(winner);
+            updateHistoryDisplay();
+
+            setTimeout(() => {
+                alert(`恭喜！抽中了： ${winner}`);
+            }, 100);
+        }
+
+        // --- 4. 事件監聽 ---
+        // (與前一版相同)
+        addNameButton.addEventListener('click', addSingleName);
+        addMultiButton.addEventListener('click', addMultiNames);
+        genNumButton.addEventListener('click', generateNumbers);
+        clearListButton.addEventListener('click', clearList);
+        clearHistoryButton.addEventListener('click', clearHistory);
+        startDrawButton.addEventListener('click', startDraw);
+        
+        singleNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addSingleName();
+            }
+        });
+        numberGenInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateNumbers();
+            }
+        });
+
+        spinButton.addEventListener('click', spin);
+        canvas.addEventListener('transitionend', onSpinEnd);
+        backToSetupButton.addEventListener('click', goBackToSetup);
+
+        // --- 5. 初始載入 ---
+        // (與前一版相同)
+        updateListDisplay();
+        updateHistoryDisplay();
+
+    </script>
+    </body>
+</html>
